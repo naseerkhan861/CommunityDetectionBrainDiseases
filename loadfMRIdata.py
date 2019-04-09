@@ -6,7 +6,7 @@ import  pandas as pd
 
 'function to joing root path and folder path where raw data is'
 def joinPath(rootPath,fileName):
-    completePath = rootPathOfData + "\\" + regions_200
+    completePath = rootPath + "\\" + fileName
     return completePath
 
 'function to list all data files absolute path'
@@ -29,8 +29,22 @@ def readFileData(path):
             timeRegions.append(regions)
     return timeRegions
 
+'Read phenotype file'
+
+def readPhenotypeFile(path):
+    with open(path,'r') as data:
+        return  pd.read_csv(path)
 
 
+
+
+'Phenotype file path'
+
+
+phenoRootPath='D:\ABIDE Dataset Complete (1035 patients)\data\phenotypes'
+phenoFileName='Phenotypic_V1_0b_preprocessed1.csv'
+phenoAbsolutePath=joinPath(phenoRootPath,phenoFileName)
+phenoData=readPhenotypeFile(phenoAbsolutePath)
 
 'Path configuration for data'
 
@@ -38,15 +52,42 @@ rootPathOfData="D:\\ABIDE Dataset Complete (1035 patients)\\data\\functionals\cp
 regions_200='rois_cc200'
 completePath=joinPath(rootPathOfData,regions_200)
 
+
+
 'listing all files in directory with absoulte path'
+
+'Sitewise dictionary for path length'
+
+site_path_length={}
 
 dataFilesPath=getAllDataFilesPath(completePath)
 
-subjectData=readFileData(dataFilesPath[0])
 
-for time_points in subjectData:
-    print("Length is:",len(time_points))
 
+for path in dataFilesPath:
+    subjectFileNameTokens=path.split("\\")
+    lastTokenSplit=subjectFileNameTokens[len(subjectFileNameTokens)-1].split("_")
+    tokenLength=len(lastTokenSplit)
+    siteName=lastTokenSplit[0]
+    if(tokenLength)==4:
+        subjectIDFromFile=lastTokenSplit[1]
+    else:
+        subjectIDFromFile = lastTokenSplit[2]
+    site_path_length[siteName]=tokenLength
+    print("-------------last Token is: ",lastTokenSplit," --------------Subject ID is: ",subjectIDFromFile)
+
+
+
+'''
+count=1
+for eachSubject in dataFilesPath:
+    print("Subject No:",count," FilePath: ",eachSubject)
+    count+=1
+    subjectData=readFileData(eachSubject)
+    subjectData.pop(0)
+    for time_points in subjectData:
+        print("Length is:",time_points)
+'''
 
 
 
