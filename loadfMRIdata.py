@@ -44,7 +44,7 @@ def readPhenotypeFile(path):
 phenoRootPath='D:\ABIDE Dataset Complete (1035 patients)\data\phenotypes'
 phenoFileName='Phenotypic_V1_0b_preprocessed1.csv'
 phenoAbsolutePath=joinPath(phenoRootPath,phenoFileName)
-phenoData=readPhenotypeFile(phenoAbsolutePath)
+pdPhenoData=readPhenotypeFile(phenoAbsolutePath)
 
 'Path configuration for data'
 
@@ -56,12 +56,20 @@ completePath=joinPath(rootPathOfData,regions_200)
 
 'listing all files in directory with absoulte path'
 
-'Sitewise dictionary for path length'
+site_path_length = {} #Sitewise dictionary for path length
+subject_autism={} #Subject Autism wise dictionary
+subID=pdPhenoData['SUB_ID']
+subAUT=pdPhenoData['DX_GROUP']
 
-site_path_length={}
+'Creating Subject Autism Dictonary'
+subject_autism_asso={}
+for index in range(len(pdPhenoData)):
+    subjectID=pdPhenoData['SUB_ID'][index]
+    autismID=pdPhenoData['DX_GROUP'][index]
+    subject_autism_asso[subjectID]=autismID
+
 
 dataFilesPath=getAllDataFilesPath(completePath)
-
 
 
 for path in dataFilesPath:
@@ -74,7 +82,6 @@ for path in dataFilesPath:
     else:
         subjectIDFromFile = lastTokenSplit[2]
     site_path_length[siteName]=tokenLength
-    print("-------------last Token is: ",lastTokenSplit," --------------Subject ID is: ",subjectIDFromFile)
 
 
 
