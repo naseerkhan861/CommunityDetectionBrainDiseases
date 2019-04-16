@@ -2,7 +2,8 @@ import os
 import  numpy as np
 import matplotlib.pyplot as plt
 import  pandas as pd
-import seaborn as sb
+from sklearn.cluster import AffinityPropagation
+from sklearn.manifold import TSNE
 
 
 'function to joing root path and folder path where raw data is'
@@ -64,6 +65,30 @@ def get_autism_healty_distribution(dic):
             tempDic['healthy']+=1
     return  tempDic
 
+def get_site_wise_stats(dic):
+    site_wise_dic={}
+    for key,val in dic.items():
+        if val not in site_wise_dic.keys():
+            site_wise_dic[val]=1
+        else:
+            site_wise_dic[val]+=1
+    return site_wise_dic
+
+def getAutismAndHealthyClusteringResults(filePath):
+    autListOfClusters=[]
+    controlListOfClusters=[]
+    for path in filePath:
+        fileIDOfSubject = getSubjectIDFromDataFilePath(path)
+        subjectfMRIData = readFileData(path)
+        timeRowsRegionCols = np.vstack(subjectfMRIData)
+        timeRowsRegionCols = timeRowsRegionCols.astype(np.float)
+        np.nan_to_num(timeRowsRegionCols,0)
+        apClustering = AffinityPropagation().fit(timeRowsRegionCols.transpose())
+        if subject_autism_asso[int(fileIDOfSubject)] == 1:
+            autListOfClusters.append(apClustering)
+        else:
+            controlListOfClusters.append(apClustering)
+    return autListOfClusters,controlListOfClusters
 'Phenotype file path'
 
 
@@ -112,18 +137,52 @@ for eachFilePath in dataFilesPath:
 
 
 
+#Site wise subject statisitcs
+site_wise_subjects_dic=get_site_wise_stats(subject_site_assoc)
+#plt.plot(*zip(*sorted(site_wise_subjects_dic.items())))
+#plt.show()
+#plt.savefig('D://images//autism//sitePlot.png')
 
 
-subjectData=readFileData(dataFilesPath[0])
-timeRowsRegionCols=np.vstack(subjectData)
-timeRowsRegionCols=timeRowsRegionCols.astype(np.float)
-regionCorrelations=np.corrcoef(timeRowsRegionCols.transpose())
-np.nan_to_num(regionCorrelations,0)    #converting nan to numbers
+#subjectData=readFileData(dataFilesPath[2])
+#timeRowsRegionCols=np.vstack(subjectData)
+#timeRowsRegionCols=timeRowsRegionCols.astype(np.float)
+#np.nan_to_num(timeRowsRegionCols,0)    #converting nan to numbers
+#reducedDataTSNE=TSNE(n_components=2).fit_transform(timeRowsRegionCols.transpose())
+#apClustering = AffinityPropagation().fit(reducedDataTSNE)
+#plt.scatter(reducedDataTSNE[:,0],reducedDataTSNE[:,1],c=apClustering.labels_)
+#plt.show()
+#regionCorrelations=np.corrcoef(timeRowsRegionCols.transpose())
+#np.nan_to_num(regionCorrelations,0)    #converting nan to numbers
 
 #subjectData.pop(0)
 
 
 
+'''
+Applying Affinity propogation technique to 200 x 200 correlation matrix
+
+autCount=1
+contCount=1
+totalCount=0
 
 
+for path in dataFilesPath:
+    totalCount+=1
+    fileIDOfSubject=getSubjectIDFromDataFilePath(path)
+    subjectfMRIData=readFileData(path)
+    timeRowsRegionCols = np.vstack(subjectfMRIData)
+    timeRowsRegionCols = timeRowsRegionCols.astype(np.float)
+    #np.nan_to_num(timeRowsRegionCols,0)
+    apClustering=AffinityPropagation().fit(timeRowsRegionCols.transpose())
+    if subject_autism_asso[int(fileIDOfSubject)]==1:
+        print("Autistic Subject ID: ",fileIDOfSubject," Shape of subjectData is:  ",len(apClustering.labels_)," AutCount is: ",autCount)
+        autCount+=1
+    else:
+        print("Control Subject ID: ",fileIDOfSubject," Shape of subjectData is:  ",len(apClustering.labels_)," ContrCount is: ",contCount)
+        contCount+=1
+'''
+
+
+autClusters,controlClusters=getAutismAndHealthyClusteringResults(dataFilesPath)
 
