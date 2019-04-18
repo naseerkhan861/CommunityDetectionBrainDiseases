@@ -7,6 +7,62 @@ from sklearn import  preprocessing
 from sklearn.manifold import TSNE
 
 
+'Site Dictionary'
+Site_Info_dic={
+            1:'PITT',
+            2:'OLIN',
+            3:'OHSU',
+            4:'SDSU',
+            5:'TRINITY',
+            6:'UM',
+            7:'USM',
+            8:'YALE',
+            9:'CMU',
+            10:'LEUVEN',
+            11:'KKI',
+            12:'NYU',
+            13:'STANFORD',
+            14:'UCLA',
+            15:'MAX_MUN',
+            16:'CALTECH',
+            17:'SBL'
+            }
+
+
+def getSubjectDataUsingSite(siteID,completePath,subjectAutismAssocDic):
+
+    filePaths=getAllDataFilesPath(completePath)
+    subjectLabels=[]
+    subjectData=[]
+    siteInfoDic=Site_Info_dic[siteID]
+    for path in filePaths:
+        tokens=path.split("\\")
+        lastToken=tokens[len(tokens)-1]
+        firstToken=lastToken.split("_")[0]
+        firstToken=firstToken.upper()
+        subjectID,siteInfo=getSubjectIDFromDataFilePath(path)
+        siteInfo=siteInfo.upper()
+        if siteInfoDic==siteInfo:
+            regionTimeData=readFileData(path)
+            timeRowsRegionCols = np.vstack(regionTimeData)
+            timeRowsRegionCols = timeRowsRegionCols.astype(np.float)
+            np.nan_to_num(timeRowsRegionCols, 0)
+            autismCondition=subjectAutismAssocDic[int(subjectID)]
+            subjectLabels.append(autismCondition)
+            subjectData.append(timeRowsRegionCols)
+    return subjectData,subjectLabels
+
+
+
+
+
+
+
+
+
+
+
+
 'function to joing root path and folder path where raw data is'
 def joinPath(rootPath,fileName):
     completePath = rootPath + "\\" + fileName
@@ -41,7 +97,7 @@ def getSubjectTimePoints(filePath):
     autTimePoints={}
     controlTimePoints={}
     for path in filePath:
-        fileIDOfSubject = getSubjectIDFromDataFilePath(path)
+        fileIDOfSubject,_ = getSubjectIDFromDataFilePath(path)
         subjectfMRIData = readFileData(path)
         timeRowsRegionCols = np.vstack(subjectfMRIData)
         timeRowsRegionCols = timeRowsRegionCols.astype(np.float)
@@ -78,7 +134,7 @@ def getSubjectIDFromDataFilePath(filePath):
     else:
         subjectIDFromFile = lastTokenSplit[2]
     #site_path_length[siteName] = tokenLength
-    return subjectIDFromFile
+    return subjectIDFromFile,siteName
     # print("Subject ID From DataFile is : ",subjectIDFromFile," Subject Label from Phenotype File is: ",subject_autism_asso[int(subjectIDFromFile)])
 
 def get_autism_healty_distribution(dic):
@@ -103,7 +159,7 @@ def getAutismAndHealthyClusteringResults(filePath):
     autListOfClusters=[]
     controlListOfClusters=[]
     for path in filePath:
-        fileIDOfSubject = getSubjectIDFromDataFilePath(path)
+        fileIDOfSubject,_ = getSubjectIDFromDataFilePath(path)
         subjectfMRIData = readFileData(path)
         timeRowsRegionCols = np.vstack(subjectfMRIData)
         timeRowsRegionCols = timeRowsRegionCols.astype(np.float)
@@ -121,7 +177,7 @@ def getAutismAndHealthyKMeansClusteringResults(filePath,clusters):
     autListOfClusters=[]
     controlListOfClusters=[]
     for path in filePath:
-        fileIDOfSubject = getSubjectIDFromDataFilePath(path)
+        fileIDOfSubject,_ = getSubjectIDFromDataFilePath(path)
         subjectfMRIData = readFileData(path)
         timeRowsRegionCols = np.vstack(subjectfMRIData)
         timeRowsRegionCols = timeRowsRegionCols.astype(np.float)
@@ -173,6 +229,8 @@ def getSubjectClusterSizeMeanForLinePlot(clusterList):
 
 
 
+
+
 phenoRootPath='D:\ABIDE Dataset Complete (1035 patients)\data\phenotypes'
 phenoFileName='Phenotypic_V1_0b_preprocessed1.csv'
 phenoAbsolutePath=joinPath(phenoRootPath,phenoFileName)
@@ -183,6 +241,9 @@ pdPhenoData=readPhenotypeFile(phenoAbsolutePath)
 rootPathOfData="D:\\ABIDE Dataset Complete (1035 patients)\\data\\functionals\cpac\\filt_global"
 regions_200='rois_cc200'
 completePath=joinPath(rootPathOfData,regions_200)
+
+
+
 
 
 
@@ -208,6 +269,9 @@ for index in range(len(pdPhenoData)):
 
 
 dataFilesPath=getAllDataFilesPath(completePath) #Reading all data files in .1D format absolute path
+
+subjectData,subjectLabels=getSubjectDataUsingSite(1,completePath,subject_autism_asso)
+
 
 '''
 for eachFilePath in dataFilesPath:
