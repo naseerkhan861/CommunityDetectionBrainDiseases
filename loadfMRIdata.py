@@ -2,7 +2,8 @@ import os
 import  numpy as np
 import matplotlib.pyplot as plt
 import  pandas as pd
-from sklearn.cluster import AffinityPropagation
+from sklearn.cluster import AffinityPropagation,KMeans,DBSCAN
+from sklearn import  preprocessing
 from sklearn.manifold import TSNE
 
 
@@ -34,6 +35,30 @@ def readFileData(path):
             count+=1
     return timeRegions
 
+def getSubjectTimePoints(filePath):
+    aut_min_max={'MIN':100000000,'MAX':-1}
+    control_min_max = {'MIN': 100000000, 'MAX': -1}
+    autTimePoints={}
+    controlTimePoints={}
+    for path in filePath:
+        fileIDOfSubject = getSubjectIDFromDataFilePath(path)
+        subjectfMRIData = readFileData(path)
+        timeRowsRegionCols = np.vstack(subjectfMRIData)
+        timeRowsRegionCols = timeRowsRegionCols.astype(np.float)
+
+        if subject_autism_asso[int(fileIDOfSubject)] == 1:
+           autTimePoints[fileIDOfSubject]=timeRowsRegionCols.shape[0]
+           if aut_min_max['MIN']>autTimePoints[fileIDOfSubject]:
+               aut_min_max['MIN']=autTimePoints[fileIDOfSubject]
+           if aut_min_max['MAX'] < autTimePoints[fileIDOfSubject]:
+               aut_min_max['MAX'] = autTimePoints[fileIDOfSubject]
+        else:
+            controlTimePoints[fileIDOfSubject] = timeRowsRegionCols.shape[0]
+            if control_min_max['MIN'] > controlTimePoints[fileIDOfSubject]:
+                control_min_max['MIN'] = controlTimePoints[fileIDOfSubject]
+            if control_min_max['MAX'] < controlTimePoints[fileIDOfSubject]:
+                control_min_max['MAX'] = controlTimePoints[fileIDOfSubject]
+    return autTimePoints,controlTimePoints,aut_min_max,control_min_max
 'Read phenotype file'
 
 def readPhenotypeFile(path):
@@ -82,6 +107,7 @@ def getAutismAndHealthyClusteringResults(filePath):
         subjectfMRIData = readFileData(path)
         timeRowsRegionCols = np.vstack(subjectfMRIData)
         timeRowsRegionCols = timeRowsRegionCols.astype(np.float)
+        #timeRowsRegionCols=preprocessing.normalize(timeRowsRegionCols)
         np.nan_to_num(timeRowsRegionCols,0)
         apClustering = AffinityPropagation().fit(timeRowsRegionCols.transpose())
         if subject_autism_asso[int(fileIDOfSubject)] == 1:
@@ -89,7 +115,62 @@ def getAutismAndHealthyClusteringResults(filePath):
         else:
             controlListOfClusters.append(apClustering)
     return autListOfClusters,controlListOfClusters
-'Phenotype file path'
+
+
+def getAutismAndHealthyKMeansClusteringResults(filePath,clusters):
+    autListOfClusters=[]
+    controlListOfClusters=[]
+    for path in filePath:
+        fileIDOfSubject = getSubjectIDFromDataFilePath(path)
+        subjectfMRIData = readFileData(path)
+        timeRowsRegionCols = np.vstack(subjectfMRIData)
+        timeRowsRegionCols = timeRowsRegionCols.astype(np.float)
+        np.nan_to_num(timeRowsRegionCols,0)
+        KMEANSClustering = KMeans(n_clusters=clusters).fit(timeRowsRegionCols.transpose())
+        if subject_autism_asso[int(fileIDOfSubject)] == 1:
+            autListOfClusters.append(KMEANSClustering)
+        else:
+            controlListOfClusters.append(KMEANSClustering)
+    return autListOfClusters,controlListOfClusters
+
+
+
+def getClusterSizeDistribution(clusterTechnique):
+    subjectClusterDistributions=[]
+    subjectClusterSize={}
+    for eachCluster in clusterTechnique:
+        regionsByClustersDic = {}
+        uniqueClusters=np.unique(eachCluster.labels_)
+        for eachVal in uniqueClusters:
+            regionsByClustersDic[eachVal]=[]
+            index=0
+        for eachLabel in eachCluster.labels_:
+            regionsByClustersDic[eachLabel].append(index)
+            index+=1
+        subjectClusterDistributions.append((regionsByClustersDic))
+    return  subjectClusterDistributions
+
+
+def getClusterSizeDistributionLengths(clusterDist):
+    subjectClustersLength=[]
+
+    for eachCluster in clusterDist:
+        clusterLengthDic={}
+        for eachKey,eachVal in eachCluster.items():
+            clusterLengthDic[eachKey]=len(eachVal)
+        subjectClustersLength.append(clusterLengthDic)
+    return subjectClustersLength
+    
+
+def getSubjectClusterSizeMeanForLinePlot(clusterList):
+    subjectClusterSizes=[]
+    for eachCluster in clusterList:
+        subjectClusters=[]
+        for key,val in eachCluster.items():
+            subjectClusters.append(val)
+        subjectClusterSizes.append(np.mean(subjectClusters))
+    return subjectClusterSizes
+
 
 
 phenoRootPath='D:\ABIDE Dataset Complete (1035 patients)\data\phenotypes'
@@ -185,4 +266,55 @@ for path in dataFilesPath:
 
 
 autClusters,controlClusters=getAutismAndHealthyClusteringResults(dataFilesPath)
+autClustersDist=[]
+contClustersDist=[]
+for clusters in autClusters:
+    autClustersDist.append(len(np.unique(clusters.labels_)))
+for clusters in controlClusters:
+    contClustersDist.append(len(np.unique(clusters.labels_)))
+
+plt.plot(autClustersDist,label='Autism (505 Subjects)')
+plt.plot(contClustersDist,label='Controls (530 Subjects')
+plt.xlabel("Subjects")
+plt.ylabel("Number of Clusters")
+plt.title("Clustering Using Affinity Propagation")
+plt.legend()
+plt.show()
+
+
+
+autClustersSize=getClusterSizeDistribution(autClusters)
+contClustersSize=getClusterSizeDistribution(controlClusters)
+
+autClusterLengthWiseDist=getClusterSizeDistributionLengths(autClustersSize)
+contClusterLengthWiseDist=getClusterSizeDistributionLengths(contClustersSize)
+
+autClusterMeanLength=getSubjectClusterSizeMeanForLinePlot(autClusterLengthWiseDist)
+contClusterMeanLength=getSubjectClusterSizeMeanForLinePlot(contClusterLengthWiseDist)
+
+plt.plot(autClusterMeanLength,label='Autism (505 Subjects)')
+plt.plot(contClusterMeanLength,label='Controls (530 Subjects')
+plt.xlabel("Subjects")
+plt.ylabel("Average Size of Cluster")
+plt.title("Clustering using Affinity Propogation")
+plt.legend()
+plt.show()
+
+
+
+
+autTimePoints,controlTimePoints,aut_min_max,cont_min_max=getSubjectTimePoints(dataFilesPath)
+
+plt.plot(list(autTimePoints.values()),label='Autism (505 Subjects)')
+plt.plot(list(controlTimePoints.values()),label='Controls (530 Subjects')
+plt.xlabel("Subjects")
+plt.ylabel("Time Points")
+plt.title("TimePoints Plot for Autism and Control")
+plt.legend()
+plt.show()
+
+
+
+
+
 
