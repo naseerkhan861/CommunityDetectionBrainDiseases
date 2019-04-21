@@ -29,6 +29,23 @@ Site_Info_dic={
             }
 
 
+'Get Site Wise training and testing Data SiteID parameters expects list of site ID'
+def getSixteenSitesDataBasedOnOneSite(completePath,siteID):
+    trainSiteSubjectDic={}
+    testSiteSubjectDic={}
+    for site in range(len(Site_Info_dic)):
+        siteIndex=site+1
+        if siteIndex not in siteID:
+            subjectData, subjectLabels, subjectDataInOneSite=getSubjectDataUsingSite(siteIndex,completePath)
+            trainSiteSubjectDic[siteIndex]=subjectDataInOneSite
+        else:
+            subjectData, subjectLabels, subjectDataInOneSite = getSubjectDataUsingSite(siteIndex, completePath)
+            testSiteSubjectDic[siteIndex] = subjectDataInOneSite
+    return trainSiteSubjectDic,testSiteSubjectDic
+
+
+
+
 def getSubjectDataUsingSite(siteID,completePath):
 
     filePaths=getAllDataFilesPath(completePath)
@@ -495,27 +512,11 @@ autTimePoints,controlTimePoints,aut_min_max,cont_min_max=getSubjectTimePoints(da
 siteWiseTimePointsDic=getSiteWiseTimePoints(completePath)
 
 
-
-
-
-
-
 subjectTimePointsDic=getSiteWiseTimePoints(completePath)
 
 
+trainSiteDic,testSiteDic=getSixteenSitesDataBasedOnOneSite(completePath,[14,15,16,17])
 
 
-
-sum=0
-for siteID in range(len((Site_Info_dic))):
-    subjectSiteData, subjectSiteLabels = getSubjectDataUsingSite(siteID+1, completePath,)
-    print("SiteID is: ",siteID+1,"   ",Site_Info_dic[siteID+1])
-    print("SiteLength is: ",len(subjectSiteData))
-    sum+=len(subjectSiteData)
-
-subjectSiteData,subjectSiteLabels=getSubjectDataUsingSite(10,completePath)
-
-
-
-siteSubjectData,siteSubjectLabel=getSubjectListUsingTimePointsFilteringBetween(150,200,completePath)
+#siteSubjectData,siteSubjectLabel=getSubjectListUsingTimePointsFilteringLower(1000,completePath)
 
