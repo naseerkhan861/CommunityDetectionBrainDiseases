@@ -23,13 +23,13 @@ Site_Info_dic={
             12:'NYU',
             13:'STANFORD',
             14:'UCLA',
-            15:'MAX_MUN',
+            15:'MAXMUN',
             16:'CALTECH',
             17:'SBL'
             }
 
 
-def getSubjectDataUsingSite(siteID,completePath,subjectAutismAssocDic):
+def getSubjectDataUsingSite(siteID,completePath):
 
     filePaths=getAllDataFilesPath(completePath)
     subjectLabels=[]
@@ -47,10 +47,31 @@ def getSubjectDataUsingSite(siteID,completePath,subjectAutismAssocDic):
             timeRowsRegionCols = np.vstack(regionTimeData)
             timeRowsRegionCols = timeRowsRegionCols.astype(np.float)
             np.nan_to_num(timeRowsRegionCols, 0)
-            autismCondition=subjectAutismAssocDic[int(subjectID)]
-            subjectLabels.append(autismCondition)
+            subjectLabels.append(subjectID)
             subjectData.append(timeRowsRegionCols)
-    return subjectData,subjectLabels
+    subjectDataInOneSite={}
+    for index  in range(len(subjectData)):
+        subjectDataInOneSite[int(subjectLabels[index])]=subjectData[index]
+    return subjectData,subjectLabels,subjectDataInOneSite
+
+
+def getSubjectListUsingTimePointsFilteringUpper(lowerTimePoint,completePath):
+    siteSubjectDataDic={}
+    siteSubjectLabelsDic={}
+    for siteID in range(len(Site_Info_dic)):
+
+        subjectSiteData, subjectSiteLabels,subjectDataDicLabels = getSubjectDataUsingSite(siteID + 1, completePath)
+        flag=True
+        for key , val in subjectDataDicLabels.items():
+            if val.shape[0]>=lowerTimePoint:
+                if flag:
+                    siteSubjectDataDic[siteID + 1] = []
+                    siteSubjectLabelsDic[siteID + 1] = []
+                    flag=False
+                siteSubjectDataDic[siteID + 1].append(val)
+                siteSubjectLabelsDic[siteID + 1].append(key)
+
+    return siteSubjectDataDic,siteSubjectLabelsDic
 
 
 
@@ -59,6 +80,62 @@ def getSubjectDataUsingSite(siteID,completePath,subjectAutismAssocDic):
 
 
 
+
+
+
+
+def getSubjectListUsingTimePointsFilteringLower(UpperTimePoint,completePath):
+    siteSubjectDataDic={}
+    siteSubjectLabelsDic={}
+    for siteID in range(len(Site_Info_dic)):
+
+        subjectSiteData, subjectSiteLabels,subjectDataDicLabels = getSubjectDataUsingSite(siteID + 1, completePath)
+        flag=True
+        for key , val in subjectDataDicLabels.items():
+            if val.shape[0]<=UpperTimePoint:
+                if flag:
+                    siteSubjectDataDic[siteID + 1] = []
+                    siteSubjectLabelsDic[siteID + 1] = []
+                    flag=False
+                siteSubjectDataDic[siteID + 1].append(val)
+                siteSubjectLabelsDic[siteID + 1].append(key)
+
+    return siteSubjectDataDic,siteSubjectLabelsDic
+
+
+
+def getSubjectListUsingTimePointsFilteringBetween(LowerTimePoint,UpperTimePoint,completePath):
+    siteSubjectDataDic = {}
+    siteSubjectLabelsDic = {}
+    for siteID in range(len(Site_Info_dic)):
+
+        subjectSiteData, subjectSiteLabels, subjectDataDicLabels = getSubjectDataUsingSite(siteID + 1, completePath)
+        flag = True
+        for key, val in subjectDataDicLabels.items():
+            if val.shape[0] <= UpperTimePoint and val.shape[0] >= LowerTimePoint:
+                if flag:
+                    siteSubjectDataDic[siteID + 1] = []
+                    siteSubjectLabelsDic[siteID + 1] = []
+                    flag = False
+                siteSubjectDataDic[siteID + 1].append(val)
+                siteSubjectLabelsDic[siteID + 1].append(key)
+
+    return siteSubjectDataDic, siteSubjectLabelsDic
+
+
+
+
+
+def getSubjectTimePointsDic(completeFilePath):
+    dataFilesPath=getAllDataFilesPath(completePath)
+    subjectTimePointsDic = {}
+    for path in dataFilesPath:
+        subjectfMRIData = readFileData(path)
+        subjectID, siteInfo = getSubjectIDFromDataFilePath(path)
+        timeRowsRegionCols = np.vstack(subjectfMRIData)
+        timeRowsRegionCols = timeRowsRegionCols.astype(np.float)
+        subjectTimePointsDic[int(subjectID)] = timeRowsRegionCols.shape
+    return subjectTimePointsDic
 
 
 
@@ -120,6 +197,21 @@ def getSubjectTimePoints(filePath):
 def readPhenotypeFile(path):
     with open(path,'r') as data:
         return  pd.read_csv(path)
+
+
+'Read Sitewise Time Points'
+
+def getSiteWiseTimePoints(completePath):
+    siteWiseTimePoints={}
+    filePaths=getAllDataFilesPath(completePath)
+    for path in filePaths:
+        fileIDOfSubject,siteInfo = getSubjectIDFromDataFilePath(path)
+        siteInfo=siteInfo.upper()
+        subjectfMRIData = readFileData(path)
+        timeRowsRegionCols = np.vstack(subjectfMRIData)
+        timeRowsRegionCols = timeRowsRegionCols.astype(np.float)
+        siteWiseTimePoints[siteInfo]=timeRowsRegionCols.shape[0]
+    return siteWiseTimePoints
 
 'Read subjectID from datafile Path Name'
 
@@ -270,7 +362,7 @@ for index in range(len(pdPhenoData)):
 
 dataFilesPath=getAllDataFilesPath(completePath) #Reading all data files in .1D format absolute path
 
-subjectData,subjectLabels=getSubjectDataUsingSite(1,completePath,subject_autism_asso)
+#subjectData,subjectLabels=getSubjectDataUsingSite(1,completePath,subject_autism_asso)
 
 
 '''
@@ -329,6 +421,15 @@ for path in dataFilesPath:
 '''
 
 
+
+
+
+
+
+
+
+
+
 autClusters,controlClusters=getAutismAndHealthyClusteringResults(dataFilesPath)
 autClustersDist=[]
 contClustersDist=[]
@@ -377,8 +478,44 @@ plt.title("TimePoints Plot for Autism and Control")
 plt.legend()
 plt.show()
 
+# Analyzing Distributions of Clusters
 
 
 
 
+
+
+
+'''
+
+'''
+
+autTimePoints,controlTimePoints,aut_min_max,cont_min_max=getSubjectTimePoints(dataFilesPath)
+
+siteWiseTimePointsDic=getSiteWiseTimePoints(completePath)
+
+
+
+
+
+
+
+subjectTimePointsDic=getSiteWiseTimePoints(completePath)
+
+
+
+
+
+sum=0
+for siteID in range(len((Site_Info_dic))):
+    subjectSiteData, subjectSiteLabels = getSubjectDataUsingSite(siteID+1, completePath,)
+    print("SiteID is: ",siteID+1,"   ",Site_Info_dic[siteID+1])
+    print("SiteLength is: ",len(subjectSiteData))
+    sum+=len(subjectSiteData)
+
+subjectSiteData,subjectSiteLabels=getSubjectDataUsingSite(10,completePath)
+
+
+
+siteSubjectData,siteSubjectLabel=getSubjectListUsingTimePointsFilteringBetween(150,200,completePath)
 
