@@ -445,6 +445,7 @@ for path in dataFilesPath:
 
 
 
+# FROM HERE
 
 
 autClusters,controlClusters=getAutismAndHealthyClusteringResults(dataFilesPath)
@@ -495,6 +496,9 @@ plt.title("TimePoints Plot for Autism and Control")
 plt.legend()
 plt.show()
 
+
+#To Here
+
 # Analyzing Distributions of Clusters
 
 
@@ -507,16 +511,31 @@ plt.show()
 
 '''
 
-autTimePoints,controlTimePoints,aut_min_max,cont_min_max=getSubjectTimePoints(dataFilesPath)
-
-siteWiseTimePointsDic=getSiteWiseTimePoints(completePath)
-
-
-subjectTimePointsDic=getSiteWiseTimePoints(completePath)
-
-
-trainSiteDic,testSiteDic=getSixteenSitesDataBasedOnOneSite(completePath,[14,15,16,17])
+#autTimePoints,controlTimePoints,aut_min_max,cont_min_max=getSubjectTimePoints(dataFilesPath)
+#siteWiseTimePointsDic=getSiteWiseTimePoints(completePath)
+#subjectTimePointsDic=getSiteWiseTimePoints(completePath)
+#trainSiteDic,testSiteDic=getSixteenSitesDataBasedOnOneSite(completePath,[14,15,16,17])
 
 
 #siteSubjectData,siteSubjectLabel=getSubjectListUsingTimePointsFilteringLower(1000,completePath)
 
+def getAutismOrHealthySubjects(completePath):
+
+    autisticSubjects={}
+    controlSubjects={}
+    filePaths=getAllDataFilesPath(completePath)
+    for path in filePaths:
+        subjectfMRIData = readFileData(path)
+        subjectID, siteInfo = getSubjectIDFromDataFilePath(path)
+        timeRowsRegionCols = np.vstack(subjectfMRIData)
+        timeRowsRegionCols = timeRowsRegionCols.astype(np.float)
+        autismAssoicationID = subject_autism_asso[int(subjectID)]
+        if autismAssoicationID==1:
+            autisticSubjects[int(subjectID)]=timeRowsRegionCols
+        else:
+            controlSubjects[int(subjectID)]=timeRowsRegionCols
+    return autisticSubjects,controlSubjects
+
+
+
+autSubjects,controlSubjects=getAutismOrHealthySubjects(completePath)
