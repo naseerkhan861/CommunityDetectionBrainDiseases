@@ -45,6 +45,36 @@ def getSixteenSitesDataBasedOnOneSite(completePath,siteID):
 
 
 
+def getAutismAndControlDataUsingSite(siteID,completePath):
+
+    filePaths=getAllDataFilesPath(completePath)
+    autisticDataDic={}
+    controlDataDic={}
+
+    siteInfoDic=Site_Info_dic[siteID]
+    for path in filePaths:
+        tokens=path.split("\\")
+        lastToken=tokens[len(tokens)-1]
+        firstToken=lastToken.split("_")[0]
+        firstToken=firstToken.upper()
+        subjectID,siteInfo=getSubjectIDFromDataFilePath(path)
+        siteInfo=siteInfo.upper()
+        if siteInfoDic==siteInfo:
+            regionTimeData=readFileData(path)
+            timeRowsRegionCols = np.vstack(regionTimeData)
+            timeRowsRegionCols = timeRowsRegionCols.astype(np.float)
+            np.nan_to_num(timeRowsRegionCols, 0)
+            condition=subject_autism_asso[int(subjectID)]
+            if condition==1:
+                autisticDataDic[int(subjectID)]=timeRowsRegionCols
+            else:
+                controlDataDic[int(subjectID)]=timeRowsRegionCols
+
+    return autisticDataDic,controlDataDic
+
+
+
+
 
 def getSubjectDataUsingSite(siteID,completePath):
 
@@ -539,3 +569,6 @@ def getAutismOrHealthySubjects(completePath):
 
 
 autSubjects,controlSubjects=getAutismOrHealthySubjects(completePath)
+plt.plot(autSubjects[51456][:,2])
+plt.plot(controlSubjects[51476][:,2])
+plt.show()
