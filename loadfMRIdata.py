@@ -28,6 +28,19 @@ Site_Info_dic={
             17:'SBL'
             }
 
+'Get Clustering Matching Score'
+def getClusterRegionMatchScore(clusterOne,clusterTwo):
+
+    clusterOneValues=list(clusterOne.values())[0]
+    clusterTwoValues=list(clusterTwo.values())[0]
+    unionOfTwoList=list(set(clusterOneValues).union(clusterTwoValues))
+    intersectionOfTwoList=list(set(clusterOneValues) & set(clusterTwoValues))
+    if len(unionOfTwoList)==0:
+        return 0
+    else:
+        return len(intersectionOfTwoList)/len(unionOfTwoList)
+
+
 
 'Get Site Wise training and testing Data SiteID parameters expects list of site ID'
 def getSixteenSitesDataBasedOnOneSite(completePath,siteID):
@@ -297,6 +310,10 @@ def get_site_wise_stats(dic):
 def getAutismAndHealthyClusteringResults(filePath):
     autListOfClusters=[]
     controlListOfClusters=[]
+
+    autListOfClustersDic = {}
+    controlListOfClustersDic = {}
+
     for path in filePath:
         fileIDOfSubject,_ = getSubjectIDFromDataFilePath(path)
         subjectfMRIData = readFileData(path)
@@ -307,9 +324,11 @@ def getAutismAndHealthyClusteringResults(filePath):
         apClustering = AffinityPropagation().fit(timeRowsRegionCols.transpose())
         if subject_autism_asso[int(fileIDOfSubject)] == 1:
             autListOfClusters.append(apClustering)
+            autListOfClustersDic[int(fileIDOfSubject)]=apClustering
         else:
             controlListOfClusters.append(apClustering)
-    return autListOfClusters,controlListOfClusters
+            controlListOfClustersDic[int(fileIDOfSubject)]=apClustering
+    return autListOfClusters,controlListOfClusters,autListOfClustersDic,controlListOfClustersDic
 
 
 def getAutismAndHealthyKMeansClusteringResults(filePath,clusters):
@@ -365,6 +384,40 @@ def getSubjectClusterSizeMeanForLinePlot(clusterList):
             subjectClusters.append(val)
         subjectClusterSizes.append(np.mean(subjectClusters))
     return subjectClusterSizes
+
+
+
+def getClusterRegionDistributionFromOneCluster(clusters):
+    uniqueLabels=np.unique(clusters)
+    labelRegionDic={}
+    labelRegionLengthDic={}
+    for eachLabel in uniqueLabels:
+        labelRegionDic[eachLabel]=[]
+    index=0
+    for label in clusters:
+        labelRegionDic[label].append(index)
+        index+=1
+    for key ,val in labelRegionDic.items():
+        labelRegionLengthDic[key]=len(val)
+    return labelRegionDic,labelRegionLengthDic
+
+
+def getAutismOrHealthySubjects(completePath):
+
+    autisticSubjects={}
+    controlSubjects={}
+    filePaths=getAllDataFilesPath(completePath)
+    for path in filePaths:
+        subjectfMRIData = readFileData(path)
+        subjectID, siteInfo = getSubjectIDFromDataFilePath(path)
+        timeRowsRegionCols = np.vstack(subjectfMRIData)
+        timeRowsRegionCols = timeRowsRegionCols.astype(np.float)
+        autismAssoicationID = subject_autism_asso[int(subjectID)]
+        if autismAssoicationID==1:
+            autisticSubjects[int(subjectID)]=timeRowsRegionCols
+        else:
+            controlSubjects[int(subjectID)]=timeRowsRegionCols
+    return autisticSubjects,controlSubjects
 
 
 
@@ -473,17 +526,21 @@ for path in dataFilesPath:
 
 
 
+#START
 
+
+
+
+#autClusters,controlClusters=getAutismAndHealthyClusteringResults(dataFilesPath)
+_,_,autClustersDic,controlClustersDic=getAutismAndHealthyClusteringResults(dataFilesPath)
 
 # FROM HERE
 
-
-autClusters,controlClusters=getAutismAndHealthyClusteringResults(dataFilesPath)
 autClustersDist=[]
 contClustersDist=[]
-for clusters in autClusters:
+for clusters in autClustersDic.values():
     autClustersDist.append(len(np.unique(clusters.labels_)))
-for clusters in controlClusters:
+for clusters in controlClustersDic.values():
     contClustersDist.append(len(np.unique(clusters.labels_)))
 
 plt.plot(autClustersDist,label='Autism (505 Subjects)')
@@ -496,8 +553,8 @@ plt.show()
 
 
 
-autClustersSize=getClusterSizeDistribution(autClusters)
-contClustersSize=getClusterSizeDistribution(controlClusters)
+autClustersSize=getClusterSizeDistribution(autClustersDic.values())
+contClustersSize=getClusterSizeDistribution(controlClustersDic.values())
 
 autClusterLengthWiseDist=getClusterSizeDistributionLengths(autClustersSize)
 contClusterLengthWiseDist=getClusterSizeDistributionLengths(contClustersSize)
@@ -527,7 +584,6 @@ plt.legend()
 plt.show()
 
 
-#To Here
 
 # Analyzing Distributions of Clusters
 
@@ -549,26 +605,130 @@ plt.show()
 
 #siteSubjectData,siteSubjectLabel=getSubjectListUsingTimePointsFilteringLower(1000,completePath)
 
-def getAutismOrHealthySubjects(completePath):
-
-    autisticSubjects={}
-    controlSubjects={}
-    filePaths=getAllDataFilesPath(completePath)
-    for path in filePaths:
-        subjectfMRIData = readFileData(path)
-        subjectID, siteInfo = getSubjectIDFromDataFilePath(path)
-        timeRowsRegionCols = np.vstack(subjectfMRIData)
-        timeRowsRegionCols = timeRowsRegionCols.astype(np.float)
-        autismAssoicationID = subject_autism_asso[int(subjectID)]
-        if autismAssoicationID==1:
-            autisticSubjects[int(subjectID)]=timeRowsRegionCols
-        else:
-            controlSubjects[int(subjectID)]=timeRowsRegionCols
-    return autisticSubjects,controlSubjects
-
 
 
 autSubjects,controlSubjects=getAutismOrHealthySubjects(completePath)
 plt.plot(autSubjects[51456][:,2])
 plt.plot(controlSubjects[51476][:,2])
 plt.show()
+
+
+
+
+'''
+
+
+'''
+
+
+
+
+labelRegionDist,labelRegionLength=getClusterRegionDistributionFromOneCluster(autClustersDic[51456].labels_)
+
+
+
+def clusterMatching(clustersDic,clusterlengthThreshold,scoreThreshold):
+    subjectClusterDic={}
+    subjectClusterCompareDic={}
+    subjectClusterCompareDicNonEmpty={}
+
+    for subjectOne in list(clustersDic.keys()):
+        subjectOnelabelRegionDistDic, subjectOnelabelRegionLengthDic = getClusterRegionDistributionFromOneCluster(
+            clustersDic[subjectOne].labels_)
+        subjectClusterCompareDic[subjectOne]={}
+        flag2=True
+        for subjectTwo in list(clustersDic.keys()):
+            flag1 = True
+            if subjectOne!=subjectTwo:
+                subjectTwolabelRegionDistDic, subjectTwolabelRegionLengthDic = getClusterRegionDistributionFromOneCluster(
+                    clustersDic[subjectTwo].labels_)
+                setOneDic,setTwoDic=compareTwoClusters(subjectOnelabelRegionDistDic,subjectTwolabelRegionDistDic,clusterlengthThreshold,scoreThreshold)
+                if setOneDic!={}:
+                    if flag2:
+                        subjectClusterDic[subjectOne] = setOneDic
+                        flag2 = False
+                    if setTwoDic!={}:
+                        if flag1:
+                            subjectClusterCompareDic[subjectOne][subjectTwo] = {}
+                            flag1=False
+
+                subjectClusterCompareDic[subjectOne][subjectTwo]=setTwoDic
+
+    for key, val in subjectClusterCompareDic.items():
+        if val!={}:
+            subjectClusterCompareDicNonEmpty[key]={}
+            for againKey, againVal in val.items():
+                if againVal != {}:
+                    subjectClusterCompareDicNonEmpty[key][againKey]=againVal
+    return subjectClusterDic,subjectClusterCompareDicNonEmpty
+
+
+def getNonEmtpyDictionary(dic):
+    nonEmtpyDic={}
+    for key, val in dic.items():
+        if val!={}:
+            nonEmtpyDic[key]={}
+            for againKey, againVal in val.items():
+                if againVal != {}:
+                    nonEmtpyDic[key][againKey]=againVal
+    return nonEmtpyDic
+
+
+
+def compareTwoClusters(setOfClustersOneDic,setOfClustersTwoDic,clusterlengthThreshold,scoreThreshold):
+    setOneClusterDic={}
+    setTwoClusterDic={}
+    for keyOne,valOne in setOfClustersOneDic.items():
+        flag=True
+        for keyTwo,valTwo in setOfClustersTwoDic.items():
+            if len(valOne)>=clusterlengthThreshold and len(valTwo)>=clusterlengthThreshold:
+                score=getClusterRegionMatchScore({keyOne:valOne},{keyTwo:valTwo})
+                if score>=scoreThreshold:
+                    if flag:
+                        setOneClusterDic[keyOne]=valOne
+                        flag=False
+                    setTwoClusterDic[keyTwo]=valTwo
+    return setOneClusterDic,setTwoClusterDic
+
+
+
+
+
+def getClusterRegionMatchScore(clusterOneDic,clusterTwoDic):
+
+    unionOfDics=list(set(list(clusterOneDic.values())[0]).union(set(list(clusterTwoDic.values())[0])))
+    intersectionOfDics=list(set(list(clusterOneDic.values())[0]) & set(list(clusterTwoDic.values())[0]))
+
+    if len(intersectionOfDics)==0:
+        return 0
+    elif len(unionOfDics)==0:
+        return 0
+    else:
+        return len(intersectionOfDics)/len(unionOfDics)
+
+
+
+
+
+
+#subjectClustersDicResults,subjectClustersDicCompareResults=clusterMatching(autClustersDic,4,0.8)
+
+
+
+
+
+
+
+
+
+#AutClusters MAXSIZE=21
+#ContClusters MAXSIZE=16
+
+subjectClustersDicResults,subjectClustersDicCompareResults=clusterMatching(autClustersDic,7,0.85)
+controlClustersDicResults,controlClustersDicCompareResults=clusterMatching(controlClustersDic,7,0.85)
+
+subjectClustersDicCompareResults=getNonEmtpyDictionary(subjectClustersDicCompareResults)
+controlClustersDicCompareResults=getNonEmtpyDictionary(controlClustersDicCompareResults)
+
+
+
