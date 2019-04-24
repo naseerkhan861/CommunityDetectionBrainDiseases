@@ -636,23 +636,24 @@ def clusterMatching(clustersDic,clusterlengthThreshold,scoreThreshold):
         subjectOnelabelRegionDistDic, subjectOnelabelRegionLengthDic = getClusterRegionDistributionFromOneCluster(
             clustersDic[subjectOne].labels_)
         subjectClusterCompareDic[subjectOne]={}
-        flag2=True
+        flag1 = True
+        flag2=False
         for subjectTwo in list(clustersDic.keys()):
-            flag1 = True
+
             if subjectOne!=subjectTwo:
                 subjectTwolabelRegionDistDic, subjectTwolabelRegionLengthDic = getClusterRegionDistributionFromOneCluster(
                     clustersDic[subjectTwo].labels_)
                 setOneDic,setTwoDic=compareTwoClusters(subjectOnelabelRegionDistDic,subjectTwolabelRegionDistDic,clusterlengthThreshold,scoreThreshold)
-                if setOneDic!={}:
-                    if flag2:
-                        subjectClusterDic[subjectOne] = setOneDic
-                        flag2 = False
+                if setOneDic!={} and flag1:
+                    subjectClusterDic[subjectOne] = {}
+                    flag1=False
+                    flag2=True
+                if  flag2:
+                    subjectClusterDic[subjectOne].update(setOneDic)
                     if setTwoDic!={}:
-                        if flag1:
-                            subjectClusterCompareDic[subjectOne][subjectTwo] = {}
-                            flag1=False
+                        subjectClusterCompareDic[subjectOne][subjectTwo] = setTwoDic
 
-                subjectClusterCompareDic[subjectOne][subjectTwo]=setTwoDic
+
 
     for key, val in subjectClusterCompareDic.items():
         if val!={}:
@@ -725,10 +726,16 @@ def getClusterRegionMatchScore(clusterOneDic,clusterTwoDic):
 #ContClusters MAXSIZE=16
 
 subjectClustersDicResults,subjectClustersDicCompareResults=clusterMatching(autClustersDic,7,0.85)
-controlClustersDicResults,controlClustersDicCompareResults=clusterMatching(controlClustersDic,7,0.85)
-
 subjectClustersDicCompareResults=getNonEmtpyDictionary(subjectClustersDicCompareResults)
+
+
+controlClustersDicResults,controlClustersDicCompareResults=clusterMatching(controlClustersDic,7,0.85)
 controlClustersDicCompareResults=getNonEmtpyDictionary(controlClustersDicCompareResults)
+
+
+
+
+
 
 
 
