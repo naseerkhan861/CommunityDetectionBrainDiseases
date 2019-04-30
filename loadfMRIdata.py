@@ -183,6 +183,25 @@ def getSubjectListUsingTimePointsFilteringBetween(LowerTimePoint,UpperTimePoint,
     return siteSubjectDataDic, siteSubjectLabelsDic
 
 
+def getSubjectListUsingTimePointsFilteringSpecifics(TimePointsList,completePath):
+    siteSubjectDataDic = {}
+    siteSubjectLabelsDic = {}
+    for siteID in range(len(Site_Info_dic)):
+
+        subjectSiteData, subjectSiteLabels, subjectDataDicLabels = getSubjectDataUsingSite(siteID + 1, completePath)
+        flag = True
+        for key, val in subjectDataDicLabels.items():
+            if val.shape[0] not in TimePointsList:
+                if flag:
+                    siteSubjectDataDic[siteID + 1] = []
+                    siteSubjectLabelsDic[siteID + 1] = []
+                    flag = False
+                siteSubjectDataDic[siteID + 1].append(val)
+                siteSubjectLabelsDic[siteID + 1].append(key)
+
+    return siteSubjectDataDic, siteSubjectLabelsDic
+
+
 
 
 
@@ -196,6 +215,8 @@ def getSubjectTimePointsDic(completeFilePath):
         timeRowsRegionCols = timeRowsRegionCols.astype(np.float)
         subjectTimePointsDic[int(subjectID)] = timeRowsRegionCols.shape
     return subjectTimePointsDic
+
+
 
 
 
@@ -334,18 +355,25 @@ def getAutismAndHealthyClusteringResults(filePath):
 def getAutismAndHealthyKMeansClusteringResults(filePath,clusters):
     autListOfClusters=[]
     controlListOfClusters=[]
+
+    autListOfClustersDic = {}
+    controlListOfClustersDic = {}
+
     for path in filePath:
         fileIDOfSubject,_ = getSubjectIDFromDataFilePath(path)
         subjectfMRIData = readFileData(path)
         timeRowsRegionCols = np.vstack(subjectfMRIData)
         timeRowsRegionCols = timeRowsRegionCols.astype(np.float)
+        #timeRowsRegionCols=preprocessing.normalize(timeRowsRegionCols)
         np.nan_to_num(timeRowsRegionCols,0)
         KMEANSClustering = KMeans(n_clusters=clusters).fit(timeRowsRegionCols.transpose())
         if subject_autism_asso[int(fileIDOfSubject)] == 1:
             autListOfClusters.append(KMEANSClustering)
+            autListOfClustersDic[int(fileIDOfSubject)]=KMEANSClustering
         else:
             controlListOfClusters.append(KMEANSClustering)
-    return autListOfClusters,controlListOfClusters
+            controlListOfClustersDic[int(fileIDOfSubject)]=KMEANSClustering
+    return autListOfClusters,controlListOfClusters,autListOfClustersDic,controlListOfClustersDic
 
 
 
@@ -422,6 +450,336 @@ def getAutismOrHealthySubjects(completePath):
 
 
 
+def analyzeClustersEvolution(subjectDic,subjectComparedDic,threshold1,threshold2,pathFlag):
+    fileName="D:\\Paper_Results\\clusterComparisons"
+
+    if pathFlag==1:
+        fileName+="\\Autism"
+    elif pathFlag==2:
+        fileName += "\\Controls"
+    else:
+        fileName += "\\Autism_Controls"
+
+    for eachSubjectKey,eachSubjectVal in subjectDic.items():
+        folderPath = fileName + "\\" + str(eachSubjectKey)
+        comparedSubjects = subjectComparedDic[eachSubjectKey]
+        os.mkdir(folderPath)
+        flag2=True
+        for secondSubject, comparedSubjectValue in comparedSubjects.items():
+            secondSubjectPath = folderPath + "\\" + str(secondSubject)
+            secondSubjectPath = secondSubjectPath + ".txt"
+            with open(secondSubjectPath, 'w') as f:
+                for _,eachVal in eachSubjectVal.items():
+                    #f.write(str(eachVal))
+                    #3f.write("\n")
+                    #f.write("\n")
+                    for _,clusters in comparedSubjectValue.items():
+                        score=getClusterRegionMatchScoreList(eachVal,clusters)
+                        if score>=threshold1 and score <= threshold2:
+                            f.write(str(clusters)+"\n")
+
+
+
+
+
+
+def getemptyfiles(rootdir):
+    for root, dirs, files in os.walk(rootdir):
+        for d in ['RECYCLER', 'RECYCLED']:
+            if d in dirs:
+                dirs.remove(d)
+
+        for f in files:
+            fullname = os.path.join(root, f)
+            try:
+                if os.path.getsize(fullname) == 0:
+                    #print(fullname)
+                    os.remove(fullname)
+            except WindowsError:
+                continue
+
+
+
+
+
+def clusterMatchingInWithingSubjects(clustersDic,clusterlengthThreshold,scoreThreshold):
+    subjectClusterDic={}
+    subjectClusterCompareDic={}
+    subjectClusterCompareDicNonEmpty={}
+
+    for subjectOne in list(clustersDic.keys()):
+        subjectOnelabelRegionDistDic, subjectOnelabelRegionLengthDic = getClusterRegionDistributionFromOneCluster(
+            clustersDic[subjectOne].labels_)
+        subjectClusterCompareDic[subjectOne]={}
+        flag1 = True
+        flag2=False
+        for subjectTwo in list(clustersDic.keys()):
+
+            if subjectOne!=subjectTwo:
+                subjectTwolabelRegionDistDic, subjectTwolabelRegionLengthDic = getClusterRegionDistributionFromOneCluster(
+                    clustersDic[subjectTwo].labels_)
+                setOneDic,setTwoDic=compareTwoClustersWithin(subjectOnelabelRegionDistDic,subjectTwolabelRegionDistDic,clusterlengthThreshold,scoreThreshold)
+                if setOneDic!={} and flag1:
+                    subjectClusterDic[subjectOne] = {}
+                    flag1=False
+                    flag2=True
+                if  flag2:
+                    subjectClusterDic[subjectOne].update(setOneDic)
+                    if setTwoDic!={}:
+                        subjectClusterCompareDic[subjectOne][subjectTwo] = setTwoDic
+
+
+
+    for key, val in subjectClusterCompareDic.items():
+        if val!={}:
+            subjectClusterCompareDicNonEmpty[key]={}
+            for againKey, againVal in val.items():
+                if againVal != {}:
+                    subjectClusterCompareDicNonEmpty[key][againKey]=againVal
+    return subjectClusterDic,subjectClusterCompareDicNonEmpty
+
+
+
+def clusterMatchingInWithinSubjectsWithoutLengthThreshold(clustersDic,scoreThreshold1,scoreThreshold2):
+    subjectClusterDic={}
+    subjectClusterCompareDic={}
+    subjectClusterCompareDicNonEmpty={}
+
+    for subjectOne in list(clustersDic.keys()):
+        subjectOnelabelRegionDistDic, subjectOnelabelRegionLengthDic = getClusterRegionDistributionFromOneCluster(
+            clustersDic[subjectOne].labels_)
+        subjectClusterCompareDic[subjectOne]={}
+        flag1 = True
+        flag2=False
+        for subjectTwo in list(clustersDic.keys()):
+
+            if subjectOne!=subjectTwo:
+                subjectTwolabelRegionDistDic, subjectTwolabelRegionLengthDic = getClusterRegionDistributionFromOneCluster(
+                    clustersDic[subjectTwo].labels_)
+                setOneDic,setTwoDic=compareTwoClustersWithinWithoutLengthTwoThreshold(subjectOnelabelRegionDistDic,subjectTwolabelRegionDistDic,scoreThreshold1,scoreThreshold2)
+                if setOneDic!={} and flag1:
+                    subjectClusterDic[subjectOne] = {}
+                    flag1=False
+                    flag2=True
+                if  flag2:
+                    subjectClusterDic[subjectOne].update(setOneDic)
+                    if setTwoDic!={}:
+                        subjectClusterCompareDic[subjectOne][subjectTwo] = setTwoDic
+
+
+
+    for key, val in subjectClusterCompareDic.items():
+        if val!={}:
+            subjectClusterCompareDicNonEmpty[key]={}
+            for againKey, againVal in val.items():
+                if againVal != {}:
+                    subjectClusterCompareDicNonEmpty[key][againKey]=againVal
+    return subjectClusterDic,subjectClusterCompareDicNonEmpty
+
+
+
+
+
+def clusterMatchingInBetweenSubjects(autclustersDic,controlclustersDic,clusterlengthThreshold,scoreThreshold):
+    subjectClusterDic={}
+    subjectClusterCompareDic={}
+    subjectClusterCompareDicNonEmpty={}
+
+    for subjectOne in list(autclustersDic.keys()):
+        subjectOnelabelRegionDistDic, subjectOnelabelRegionLengthDic = getClusterRegionDistributionFromOneCluster(
+            autclustersDic[subjectOne].labels_)
+        subjectClusterCompareDic[subjectOne]={}
+        flag1 = True
+        flag2=False
+        for subjectTwo in list(controlclustersDic.keys()):
+            subjectTwolabelRegionDistDic, subjectTwolabelRegionLengthDic = getClusterRegionDistributionFromOneCluster(
+                controlclustersDic[subjectTwo].labels_)
+            setOneDic,setTwoDic=compareTwoClustersBetween(subjectOnelabelRegionDistDic,subjectTwolabelRegionDistDic,clusterlengthThreshold,scoreThreshold)
+            if setOneDic!={} and flag1:
+                subjectClusterDic[subjectOne] = {}
+                flag1=False
+                flag2=True
+            if  flag2:
+                subjectClusterDic[subjectOne].update(setOneDic)
+                if setTwoDic!={}:
+                    subjectClusterCompareDic[subjectOne][subjectTwo] = setTwoDic
+
+
+
+    for key, val in subjectClusterCompareDic.items():
+        if val!={}:
+            subjectClusterCompareDicNonEmpty[key]={}
+            for againKey, againVal in val.items():
+                if againVal != {}:
+                    subjectClusterCompareDicNonEmpty[key][againKey]=againVal
+    return subjectClusterDic,subjectClusterCompareDicNonEmpty
+
+
+def clusterMatchingInBetweenSubjectsWithoutLength(autclustersDic,controlclustersDic,scoreThreshold1,scoreThreshold2):
+    subjectClusterDic={}
+    subjectClusterCompareDic={}
+    subjectClusterCompareDicNonEmpty={}
+
+    for subjectOne in list(autclustersDic.keys()):
+        subjectOnelabelRegionDistDic, subjectOnelabelRegionLengthDic = getClusterRegionDistributionFromOneCluster(
+            autclustersDic[subjectOne].labels_)
+        subjectClusterCompareDic[subjectOne]={}
+        flag1 = True
+        flag2=False
+        for subjectTwo in list(controlclustersDic.keys()):
+            subjectTwolabelRegionDistDic, subjectTwolabelRegionLengthDic = getClusterRegionDistributionFromOneCluster(
+                controlclustersDic[subjectTwo].labels_)
+            setOneDic,setTwoDic=compareTwoClustersBetweenTwoThresholdWithoutLength(subjectOnelabelRegionDistDic,subjectTwolabelRegionDistDic,scoreThreshold1,scoreThreshold2)
+            if setOneDic!={} and flag1:
+                subjectClusterDic[subjectOne] = {}
+                flag1=False
+                flag2=True
+            if  flag2:
+                subjectClusterDic[subjectOne].update(setOneDic)
+                if setTwoDic!={}:
+                    subjectClusterCompareDic[subjectOne][subjectTwo] = setTwoDic
+
+
+
+    for key, val in subjectClusterCompareDic.items():
+        if val!={}:
+            subjectClusterCompareDicNonEmpty[key]={}
+            for againKey, againVal in val.items():
+                if againVal != {}:
+                    subjectClusterCompareDicNonEmpty[key][againKey]=againVal
+    return subjectClusterDic,subjectClusterCompareDicNonEmpty
+
+
+
+
+def getNonEmtpyDictionary(dic):
+    nonEmtpyDic={}
+    for key, val in dic.items():
+        if val!={}:
+            nonEmtpyDic[key]={}
+            for againKey, againVal in val.items():
+                if againVal != {}:
+                    nonEmtpyDic[key][againKey]=againVal
+    return nonEmtpyDic
+
+
+
+def compareTwoClustersWithin(setOfClustersOneDic,setOfClustersTwoDic,clusterlengthThreshold,scoreThreshold):
+    setOneClusterDic={}
+    setTwoClusterDic={}
+    for keyOne,valOne in setOfClustersOneDic.items():
+        flag=True
+        for keyTwo,valTwo in setOfClustersTwoDic.items():
+            if len(valOne)>=clusterlengthThreshold and len(valTwo)>=clusterlengthThreshold:
+                score=getClusterRegionMatchScore({keyOne:valOne},{keyTwo:valTwo})
+                if score>=scoreThreshold:
+                    if flag:
+                        setOneClusterDic[keyOne]=valOne
+                        flag=False
+                    setTwoClusterDic[keyTwo]=valTwo
+    return setOneClusterDic,setTwoClusterDic
+
+
+def compareTwoClustersBetween(setOfClustersOneDic,setOfClustersTwoDic,clusterlengthThreshold,scoreThreshold):
+    setOneClusterDic={}
+    setTwoClusterDic={}
+    for keyOne,valOne in setOfClustersOneDic.items():
+        flag=True
+        for keyTwo,valTwo in setOfClustersTwoDic.items():
+            if len(valOne)>=clusterlengthThreshold and len(valTwo)>=clusterlengthThreshold:
+                score=getClusterRegionMatchScore({keyOne:valOne},{keyTwo:valTwo})
+                if score<=scoreThreshold:
+                    if flag:
+                        setOneClusterDic[keyOne]=valOne
+                        flag=False
+                    setTwoClusterDic[keyTwo]=valTwo
+    return setOneClusterDic,setTwoClusterDic
+
+
+def compareTwoClustersBetweenTwoThresholdWithoutLength(setOfClustersOneDic,setOfClustersTwoDic,scoreThreshold1,scoreThreshold2):
+    setOneClusterDic={}
+    setTwoClusterDic={}
+    for keyOne,valOne in setOfClustersOneDic.items():
+        flag=True
+        for keyTwo,valTwo in setOfClustersTwoDic.items():
+            if len(valOne)>=2 and len(valTwo)>=2:
+                score=getClusterRegionMatchScore({keyOne:valOne},{keyTwo:valTwo})
+                if score>=scoreThreshold1 and score<=scoreThreshold2:
+                    if flag:
+                        setOneClusterDic[keyOne]=valOne
+                        flag=False
+                    setTwoClusterDic[keyTwo]=valTwo
+    return setOneClusterDic,setTwoClusterDic
+
+
+def compareTwoClustersWithinWithoutLengthThreshold(setOfClustersOneDic,setOfClustersTwoDic,scoreThreshold):
+    setOneClusterDic={}
+    setTwoClusterDic={}
+    for keyOne,valOne in setOfClustersOneDic.items():
+        flag=True
+        for keyTwo,valTwo in setOfClustersTwoDic.items():
+            if len(valOne)>=2 and len(valTwo)>=2:
+                score=getClusterRegionMatchScore({keyOne:valOne},{keyTwo:valTwo})
+                if score>=scoreThreshold:
+                    if flag:
+                        setOneClusterDic[keyOne]=valOne
+                        flag=False
+                    setTwoClusterDic[keyTwo]=valTwo
+    return setOneClusterDic,setTwoClusterDic
+
+
+def compareTwoClustersWithinWithoutLengthTwoThreshold(setOfClustersOneDic,setOfClustersTwoDic,scoreThreshold1,scoreThreshold2):
+    setOneClusterDic={}
+    setTwoClusterDic={}
+    for keyOne,valOne in setOfClustersOneDic.items():
+        flag=True
+        for keyTwo,valTwo in setOfClustersTwoDic.items():
+            if len(valOne)>=2 and len(valTwo)>=2:
+                score=getClusterRegionMatchScore({keyOne:valOne},{keyTwo:valTwo})
+                if score>=scoreThreshold1 and score<=scoreThreshold2:
+                    if flag:
+                        setOneClusterDic[keyOne]=valOne
+                        flag=False
+                    setTwoClusterDic[keyTwo]=valTwo
+    return setOneClusterDic,setTwoClusterDic
+
+
+def getClusterRegionMatchScore(clusterOneDic,clusterTwoDic):
+
+    unionOfDics=list(set(list(clusterOneDic.values())[0]).union(set(list(clusterTwoDic.values())[0])))
+    intersectionOfDics=list(set(list(clusterOneDic.values())[0]) & set(list(clusterTwoDic.values())[0]))
+
+    if len(intersectionOfDics)==0:
+        return 0
+    elif len(unionOfDics)==0:
+        return 0
+    else:
+        return len(intersectionOfDics)/len(unionOfDics)
+
+
+
+def getClusterRegionMatchScoreList(clusterOneArray,clusterTwoArray):
+
+    unionOfDics=list(set(clusterOneArray) | set(clusterTwoArray))
+    intersectionOfDics=list(set(clusterOneArray) & set(clusterTwoArray))
+
+    if len(intersectionOfDics)==0:
+        return 0
+    elif len(unionOfDics)==0:
+        return 0
+    else:
+        return len(intersectionOfDics)/len(unionOfDics)
+
+
+
+
+
+
+
+
+
+
+
 
 phenoRootPath='D:\ABIDE Dataset Complete (1035 patients)\data\phenotypes'
 phenoFileName='Phenotypic_V1_0b_preprocessed1.csv'
@@ -433,7 +791,6 @@ pdPhenoData=readPhenotypeFile(phenoAbsolutePath)
 rootPathOfData="D:\\ABIDE Dataset Complete (1035 patients)\\data\\functionals\cpac\\filt_global"
 regions_200='rois_cc200'
 completePath=joinPath(rootPathOfData,regions_200)
-
 
 
 
@@ -465,10 +822,7 @@ dataFilesPath=getAllDataFilesPath(completePath) #Reading all data files in .1D f
 #subjectData,subjectLabels=getSubjectDataUsingSite(1,completePath,subject_autism_asso)
 
 
-'''
-for eachFilePath in dataFilesPath:
-    print("Subject ID From File is : ",getSubjectIDFromDataFilePath(eachFilePath))
-'''
+
 
 #print("Subject ID From DataFile is : ",subjectIDFromFile," Subject Label from Phenotype File is: ",subject_autism_asso[int(subjectIDFromFile)])
 
@@ -496,38 +850,17 @@ site_wise_subjects_dic=get_site_wise_stats(subject_site_assoc)
 
 
 
+
+
+
+
+
+
+
+
+#
+#THE START
 '''
-Applying Affinity propogation technique to 200 x 200 correlation matrix
-
-autCount=1
-contCount=1
-totalCount=0
-
-
-for path in dataFilesPath:
-    totalCount+=1
-    fileIDOfSubject=getSubjectIDFromDataFilePath(path)
-    subjectfMRIData=readFileData(path)
-    timeRowsRegionCols = np.vstack(subjectfMRIData)
-    timeRowsRegionCols = timeRowsRegionCols.astype(np.float)
-    #np.nan_to_num(timeRowsRegionCols,0)
-    apClustering=AffinityPropagation().fit(timeRowsRegionCols.transpose())
-    if subject_autism_asso[int(fileIDOfSubject)]==1:
-        print("Autistic Subject ID: ",fileIDOfSubject," Shape of subjectData is:  ",len(apClustering.labels_)," AutCount is: ",autCount)
-        autCount+=1
-    else:
-        print("Control Subject ID: ",fileIDOfSubject," Shape of subjectData is:  ",len(apClustering.labels_)," ContrCount is: ",contCount)
-        contCount+=1
-'''
-
-
-
-
-
-
-
-#START
-
 
 
 
@@ -615,104 +948,6 @@ plt.show()
 
 
 
-'''
-
-
-'''
-
-
-
-
-labelRegionDist,labelRegionLength=getClusterRegionDistributionFromOneCluster(autClustersDic[51456].labels_)
-
-
-
-def clusterMatching(clustersDic,clusterlengthThreshold,scoreThreshold):
-    subjectClusterDic={}
-    subjectClusterCompareDic={}
-    subjectClusterCompareDicNonEmpty={}
-
-    for subjectOne in list(clustersDic.keys()):
-        subjectOnelabelRegionDistDic, subjectOnelabelRegionLengthDic = getClusterRegionDistributionFromOneCluster(
-            clustersDic[subjectOne].labels_)
-        subjectClusterCompareDic[subjectOne]={}
-        flag1 = True
-        flag2=False
-        for subjectTwo in list(clustersDic.keys()):
-
-            if subjectOne!=subjectTwo:
-                subjectTwolabelRegionDistDic, subjectTwolabelRegionLengthDic = getClusterRegionDistributionFromOneCluster(
-                    clustersDic[subjectTwo].labels_)
-                setOneDic,setTwoDic=compareTwoClusters(subjectOnelabelRegionDistDic,subjectTwolabelRegionDistDic,clusterlengthThreshold,scoreThreshold)
-                if setOneDic!={} and flag1:
-                    subjectClusterDic[subjectOne] = {}
-                    flag1=False
-                    flag2=True
-                if  flag2:
-                    subjectClusterDic[subjectOne].update(setOneDic)
-                    if setTwoDic!={}:
-                        subjectClusterCompareDic[subjectOne][subjectTwo] = setTwoDic
-
-
-
-    for key, val in subjectClusterCompareDic.items():
-        if val!={}:
-            subjectClusterCompareDicNonEmpty[key]={}
-            for againKey, againVal in val.items():
-                if againVal != {}:
-                    subjectClusterCompareDicNonEmpty[key][againKey]=againVal
-    return subjectClusterDic,subjectClusterCompareDicNonEmpty
-
-
-def getNonEmtpyDictionary(dic):
-    nonEmtpyDic={}
-    for key, val in dic.items():
-        if val!={}:
-            nonEmtpyDic[key]={}
-            for againKey, againVal in val.items():
-                if againVal != {}:
-                    nonEmtpyDic[key][againKey]=againVal
-    return nonEmtpyDic
-
-
-
-def compareTwoClusters(setOfClustersOneDic,setOfClustersTwoDic,clusterlengthThreshold,scoreThreshold):
-    setOneClusterDic={}
-    setTwoClusterDic={}
-    for keyOne,valOne in setOfClustersOneDic.items():
-        flag=True
-        for keyTwo,valTwo in setOfClustersTwoDic.items():
-            if len(valOne)>=clusterlengthThreshold and len(valTwo)>=clusterlengthThreshold:
-                score=getClusterRegionMatchScore({keyOne:valOne},{keyTwo:valTwo})
-                if score>=scoreThreshold:
-                    if flag:
-                        setOneClusterDic[keyOne]=valOne
-                        flag=False
-                    setTwoClusterDic[keyTwo]=valTwo
-    return setOneClusterDic,setTwoClusterDic
-
-
-
-
-
-def getClusterRegionMatchScore(clusterOneDic,clusterTwoDic):
-
-    unionOfDics=list(set(list(clusterOneDic.values())[0]).union(set(list(clusterTwoDic.values())[0])))
-    intersectionOfDics=list(set(list(clusterOneDic.values())[0]) & set(list(clusterTwoDic.values())[0]))
-
-    if len(intersectionOfDics)==0:
-        return 0
-    elif len(unionOfDics)==0:
-        return 0
-    else:
-        return len(intersectionOfDics)/len(unionOfDics)
-
-
-
-
-
-
-#subjectClustersDicResults,subjectClustersDicCompareResults=clusterMatching(autClustersDic,4,0.8)
 
 
 
@@ -722,15 +957,66 @@ def getClusterRegionMatchScore(clusterOneDic,clusterTwoDic):
 
 
 
+
+
+
+
+
+'Comparing Clusters of one type that is comparing every Autistic Clusters or Healthy Clusters'
 #AutClusters MAXSIZE=21
 #ContClusters MAXSIZE=16
 
-subjectClustersDicResults,subjectClustersDicCompareResults=clusterMatching(autClustersDic,7,0.85)
+
+
+subjectClustersDicResults,subjectClustersDicCompareResults=clusterMatchingInWithinSubjectsWithoutLengthThreshold(autClustersDic,0.8,1.0)
 subjectClustersDicCompareResults=getNonEmtpyDictionary(subjectClustersDicCompareResults)
 
 
-controlClustersDicResults,controlClustersDicCompareResults=clusterMatching(controlClustersDic,7,0.85)
+
+
+controlClustersDicResults,controlClustersDicCompareResults=clusterMatchingInWithinSubjectsWithoutLengthThreshold(controlClustersDic,0.8,1.0)
 controlClustersDicCompareResults=getNonEmtpyDictionary(controlClustersDicCompareResults)
+singleTypeClustersDicResults,twoTypeClustersComparedResults=clusterMatchingInBetweenSubjectsWithoutLength(autClustersDic,controlClustersDic,0.0,0.2)
+twoTypeClustersComparedResults=getNonEmtpyDictionary(twoTypeClustersComparedResults)
+
+autismLengthDic={}
+controlLengthDic={}
+betweenSubjectControlDic={}
+
+with  open("D:\Paper_Results\\autistic.txt",'w') as f:
+    for index,key  in enumerate(subjectClustersDicResults):
+        subject=key
+        length=len(subjectClustersDicCompareResults[key])
+        autismLengthDic[key]=length
+        f.write(str(length)+"\n")
+
+with  open("D:\Paper_Results\\controls.txt", 'w') as f:
+    for index, key in enumerate(controlClustersDicResults):
+        subject = key
+        length = len(controlClustersDicCompareResults[key])
+        controlLengthDic[key]=length
+        f.write(str(length) + "\n")
+
+with  open("D:\Paper_Results\\betweenSubjectControl.txt", 'w') as f:
+    for index, key in enumerate(singleTypeClustersDicResults):
+        subject = key
+        length = len(twoTypeClustersComparedResults[key])
+        betweenSubjectControlDic[key] = length
+        f.write(str(length) + "\n")
+
+
+
+'Comparing Subject vs Compared Subjects'
+
+autSubject,autLength=list(autismLengthDic.keys()),list(autismLengthDic.values())
+contSubject,contLength=list(controlLengthDic.keys()),list(controlLengthDic.values())
+plt.plot(list(autismLengthDic.values()),label="Autism 505 Subjects")
+plt.plot(list(controlLengthDic.values()),label="Healthy 529 Subjects")
+plt.xlabel("Subjects")
+plt.ylabel("Compared Subjects")
+plt.title("Subject Vs (Number of Compared Subjects)")
+plt.legend()
+plt.show()
 
 
 
@@ -739,3 +1025,86 @@ controlClustersDicCompareResults=getNonEmtpyDictionary(controlClustersDicCompare
 
 
 
+
+
+
+
+analyzeClustersEvolution(subjectClustersDicResults,subjectClustersDicCompareResults,0.8,1.0,1)
+analyzeClustersEvolution(controlClustersDicResults,controlClustersDicCompareResults,0.8,1.0,2)
+analyzeClustersEvolution(singleTypeClustersDicResults,twoTypeClustersComparedResults,0.8,1.0,3)
+getemptyfiles("D:\Paper_Results\clusterComparisons\Autism_Controls")
+
+
+
+
+
+
+def getTimePointsBasedDict(autTimes,controlTimes):
+    timePointsDic={}
+    for autkey,autVal in autTimes.items():
+        if autVal in list(timePointsDic.keys()):
+            timePointsDic[autVal]+=1
+        else:
+            timePointsDic[autVal]=1
+
+    for contkey,contVal in controlTimes.items():
+        if contVal  in list(timePointsDic.keys()):
+            timePointsDic[contVal]+=1
+        else:
+            timePointsDic[contVal]=1
+
+    return timePointsDic
+
+
+timePointsDic=getTimePointsBasedDict(autTimePoints,controlTimePoints)
+
+
+
+
+allTimePoints,allTimeFrequency=list(timePointsDic.keys()),list(timePointsDic.values())
+plt.bar(allTimePoints,allTimeFrequency)
+plt.xlabel("Time Points")
+plt.ylabel("Number of Subjects")
+plt.title("Time Points Distribution for Subjects")
+plt.xticks(rotation=90)
+plt.show()
+
+
+
+
+siteSubjectDataSpecifics,siteSubjectLabelsSpecifics=getSubjectListUsingTimePointsFilteringSpecifics([232,234],completePath)
+
+for key,val in siteSubjectLabelsSpecifics.items():
+    print(Site_Info_dic[key],len(val))
+
+
+
+'''
+#THEEND
+
+def getDataFileSiteDic(completePath,SiteDic):
+
+    dataFilesPath = getAllDataFilesPath(completePath)
+    siteSubjectDataDic = {}
+    dataSiteSubjectsCountDic={}
+    count1=0
+    count2=0
+    for path in dataFilesPath:
+        subjectID, siteInfo = getSubjectIDFromDataFilePath(path)
+        siteInfo=siteInfo.upper()
+        for siteId in range(len(SiteDic)):
+            siteId=siteId+1
+            if siteInfo==SiteDic[siteId]:
+                if siteId not in list(siteSubjectDataDic.keys()):
+                    siteSubjectDataDic[siteId]=[]
+                    siteSubjectDataDic[siteId].append(subjectID)
+                else:
+                    siteSubjectDataDic[siteId].append(subjectID)
+    for siteId in range(len(SiteDic)):
+        siteName=SiteDic[siteId+1]
+        subjectsCount=len(siteSubjectDataDic[siteId+1])
+        dataSiteSubjectsCountDic[siteName]=subjectsCount
+
+    return siteSubjectDataDic,dataSiteSubjectsCountDic
+
+siteSubjectIDDic,siteSubjectTotalDic=getDataFileSiteDic(completePath,Site_Info_dic)
