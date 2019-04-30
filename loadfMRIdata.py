@@ -184,6 +184,7 @@ def getSubjectListUsingTimePointsFilteringBetween(LowerTimePoint,UpperTimePoint,
 
 
 def getSubjectListUsingTimePointsFilteringSpecifics(TimePointsList,completePath):
+    count=0
     siteSubjectDataDic = {}
     siteSubjectLabelsDic = {}
     for siteID in range(len(Site_Info_dic)):
@@ -198,6 +199,9 @@ def getSubjectListUsingTimePointsFilteringSpecifics(TimePointsList,completePath)
                     flag = False
                 siteSubjectDataDic[siteID + 1].append(val)
                 siteSubjectLabelsDic[siteID + 1].append(key)
+            else:
+                count+=1
+    print("Deleted Time Points: ",count)
 
     return siteSubjectDataDic, siteSubjectLabelsDic
 
@@ -413,6 +417,31 @@ def getSubjectClusterSizeMeanForLinePlot(clusterList):
         subjectClusterSizes.append(np.mean(subjectClusters))
     return subjectClusterSizes
 
+
+def getDataFileSiteDic(completePath,SiteDic):
+
+    dataFilesPath = getAllDataFilesPath(completePath)
+    siteSubjectDataDic = {}
+    dataSiteSubjectsCountDic={}
+    count1=0
+    count2=0
+    for path in dataFilesPath:
+        subjectID, siteInfo = getSubjectIDFromDataFilePath(path)
+        siteInfo=siteInfo.upper()
+        for siteId in range(len(SiteDic)):
+            siteId=siteId+1
+            if siteInfo==SiteDic[siteId]:
+                if siteId not in list(siteSubjectDataDic.keys()):
+                    siteSubjectDataDic[siteId]=[]
+                    siteSubjectDataDic[siteId].append(int(subjectID))
+                else:
+                    siteSubjectDataDic[siteId].append(int(subjectID))
+    for siteId in range(len(SiteDic)):
+        siteName=SiteDic[siteId+1]
+        subjectsCount=len(siteSubjectDataDic[siteId+1])
+        dataSiteSubjectsCountDic[siteName]=subjectsCount
+
+    return siteSubjectDataDic,dataSiteSubjectsCountDic
 
 
 def getClusterRegionDistributionFromOneCluster(clusters):
@@ -772,7 +801,21 @@ def getClusterRegionMatchScoreList(clusterOneArray,clusterTwoArray):
 
 
 
+def getTimePointsBasedDict(autTimes,controlTimes):
+    timePointsDic={}
+    for autkey,autVal in autTimes.items():
+        if autVal in list(timePointsDic.keys()):
+            timePointsDic[autVal]+=1
+        else:
+            timePointsDic[autVal]=1
 
+    for contkey,contVal in controlTimes.items():
+        if contVal  in list(timePointsDic.keys()):
+            timePointsDic[contVal]+=1
+        else:
+            timePointsDic[contVal]=1
+
+    return timePointsDic
 
 
 
@@ -860,7 +903,7 @@ site_wise_subjects_dic=get_site_wise_stats(subject_site_assoc)
 
 #
 #THE START
-'''
+
 
 
 
@@ -1039,21 +1082,7 @@ getemptyfiles("D:\Paper_Results\clusterComparisons\Autism_Controls")
 
 
 
-def getTimePointsBasedDict(autTimes,controlTimes):
-    timePointsDic={}
-    for autkey,autVal in autTimes.items():
-        if autVal in list(timePointsDic.keys()):
-            timePointsDic[autVal]+=1
-        else:
-            timePointsDic[autVal]=1
 
-    for contkey,contVal in controlTimes.items():
-        if contVal  in list(timePointsDic.keys()):
-            timePointsDic[contVal]+=1
-        else:
-            timePointsDic[contVal]=1
-
-    return timePointsDic
 
 
 timePointsDic=getTimePointsBasedDict(autTimePoints,controlTimePoints)
@@ -1071,40 +1100,16 @@ plt.show()
 
 
 
+def getSiteDictionaryCountFromSiteSubjectDict(siteSubjectDic,SiteInfo):
 
-siteSubjectDataSpecifics,siteSubjectLabelsSpecifics=getSubjectListUsingTimePointsFilteringSpecifics([232,234],completePath)
+    siteSubjectTotalDic={}
+    for key,val in siteSubjectDic.items():
+        siteInfoName=SiteInfo[key]
+        siteSubjectTotalDic[siteInfoName]=len(val)
+    return siteSubjectTotalDic
 
-for key,val in siteSubjectLabelsSpecifics.items():
-    print(Site_Info_dic[key],len(val))
 
-
-
-'''
-#THEEND
-
-def getDataFileSiteDic(completePath,SiteDic):
-
-    dataFilesPath = getAllDataFilesPath(completePath)
-    siteSubjectDataDic = {}
-    dataSiteSubjectsCountDic={}
-    count1=0
-    count2=0
-    for path in dataFilesPath:
-        subjectID, siteInfo = getSubjectIDFromDataFilePath(path)
-        siteInfo=siteInfo.upper()
-        for siteId in range(len(SiteDic)):
-            siteId=siteId+1
-            if siteInfo==SiteDic[siteId]:
-                if siteId not in list(siteSubjectDataDic.keys()):
-                    siteSubjectDataDic[siteId]=[]
-                    siteSubjectDataDic[siteId].append(subjectID)
-                else:
-                    siteSubjectDataDic[siteId].append(subjectID)
-    for siteId in range(len(SiteDic)):
-        siteName=SiteDic[siteId+1]
-        subjectsCount=len(siteSubjectDataDic[siteId+1])
-        dataSiteSubjectsCountDic[siteName]=subjectsCount
-
-    return siteSubjectDataDic,dataSiteSubjectsCountDic
+siteSubjectDataSpecifics,siteSubjectLabelsSpecifics=getSubjectListUsingTimePointsFilteringSpecifics([202,124,177,232,234],completePath)
+siteSubjectLabelsSpecifics=getSiteDictionaryCountFromSiteSubjectDict(siteSubjectLabelsSpecifics,Site_Info_dic)
 
 siteSubjectIDDic,siteSubjectTotalDic=getDataFileSiteDic(completePath,Site_Info_dic)
