@@ -58,6 +58,7 @@ def getSixteenSitesDataBasedOnOneSite(completePath,siteID):
 
 
 
+
 def getAutismAndControlDataUsingSite(siteID,completePath):
 
     filePaths=getAllDataFilesPath(completePath)
@@ -459,6 +460,8 @@ def getClusterRegionDistributionFromOneCluster(clusters):
     return labelRegionDic,labelRegionLengthDic
 
 
+
+#Following Code outputs the status of Autism or Healthy on a Subject using a Dictionary mapping
 def getAutismOrHealthySubjects(completePath):
 
     autisticSubjects={}
@@ -817,8 +820,27 @@ def getTimePointsBasedDict(autTimes,controlTimes):
 
     return timePointsDic
 
+def getSiteDictionaryCountFromSiteSubjectDict(siteSubjectDic,SiteInfo):
+
+    siteSubjectTotalDic={}
+    for key,val in siteSubjectDic.items():
+        siteInfoName=SiteInfo[key]
+        siteSubjectTotalDic[siteInfoName]=len(val)
+    return siteSubjectTotalDic
 
 
+# This function creates subjectID wise map of the data so that one ID is associated with one absolute path
+def getSubjectPathMapping(completePath,subjectAutismAssoDic):
+
+    subjectPathMapDic={}
+    subjectAutismStatus={}
+    filePaths=getAllDataFilesPath(completePath)
+    for path in filePaths:
+        subjectID, siteInfo = getSubjectIDFromDataFilePath(path)
+        subjectID=int(subjectID)
+        subjectPathMapDic[subjectID]=path
+        subjectAutismStatus[subjectID] = subjectAutismAssoDic[subjectID]
+    return subjectPathMapDic , subjectAutismStatus
 
 
 
@@ -834,6 +856,10 @@ pdPhenoData=readPhenotypeFile(phenoAbsolutePath)
 rootPathOfData="D:\\ABIDE Dataset Complete (1035 patients)\\data\\functionals\cpac\\filt_global"
 regions_200='rois_cc200'
 completePath=joinPath(rootPathOfData,regions_200)
+
+
+
+
 
 
 
@@ -1100,16 +1126,42 @@ plt.show()
 
 
 
-def getSiteDictionaryCountFromSiteSubjectDict(siteSubjectDic,SiteInfo):
 
-    siteSubjectTotalDic={}
-    for key,val in siteSubjectDic.items():
-        siteInfoName=SiteInfo[key]
-        siteSubjectTotalDic[siteInfoName]=len(val)
-    return siteSubjectTotalDic
-
+#Site wise data of subjects, following function returns subjects ID in a site
 
 siteSubjectDataSpecifics,siteSubjectLabelsSpecifics=getSubjectListUsingTimePointsFilteringSpecifics([202,124,177,232,234],completePath)
-siteSubjectLabelsSpecifics=getSiteDictionaryCountFromSiteSubjectDict(siteSubjectLabelsSpecifics,Site_Info_dic)
 
+siteSubjectLabelsSpecificsTotal=getSiteDictionaryCountFromSiteSubjectDict(siteSubjectLabelsSpecifics,Site_Info_dic)
+
+
+# A one time total Dictionary of sites and subjects from the data folder
 siteSubjectIDDic,siteSubjectTotalDic=getDataFileSiteDic(completePath,Site_Info_dic)
+
+
+
+
+#SubjectID and Absolute Path mapping with labels also
+subjectPathMapDic,subjectAutismDic=getSubjectPathMapping(completePath,subject_autism_asso)
+
+
+
+
+#Function that reads all the data given in the site dictionary and returns the data also in a site dictionary with labels
+def getSubjectsDataBasedOnSiteWiseSubjectDictionary(siteSubjectDic,subjectPathMapping,subject_autism_asso):
+
+    siteSubjectDataDic={}
+    for key in list(siteSubjectDic.keys()):
+        siteSubjectDataDic[key]={}
+        for subjectID in siteSubjectDic[key]:
+            subjectPath=subjectPathMapping[subjectID]
+            subjectData=readFileData(subjectPath)
+            timeRowsRegionCols = np.vstack(subjectData)
+            timeRowsRegionCols = timeRowsRegionCols.astype(np.float)
+            autismCondition=subject_autism_asso[subjectID]
+            siteSubjectDataDic[key][subjectID]=[]
+            siteSubjectDataDic[key][subjectID].append(timeRowsRegionCols)
+            siteSubjectDataDic[key][subjectID].append(autismCondition)
+    return siteSubjectDataDic
+
+
+siteSubjectRawDataDic=getSubjectsDataBasedOnSiteWiseSubjectDictionary(siteSubjectLabelsSpecifics,subjectPathMapDic,subject_autism_asso)
